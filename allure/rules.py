@@ -77,6 +77,50 @@ class Element(Rule):
         self.namespace = namespace
 
     def value(self, name, what):
+        from _pytest._code.code import (
+            ReprEntry,
+            ReprEntryNative,
+            ReprExceptionInfo,
+            ReprFileLocation,
+            ReprFuncArgs,
+            ReprLocals,
+            ReprTraceback
+        )
+        if not isinstance(what, str):
+            unserialized_entries = []
+            reprentry = None
+            for entry_data in what.reprtraceback.reprentries:
+                data = entry_data['data']
+                entry_type = entry_data['type']
+                if entry_type == 'ReprEntry':
+                    reprfuncargs = None
+                    reprfileloc = None
+                    reprlocals = None
+                    if data['reprfuncargs']:
+                        reprfuncargs = ReprFuncArgs(
+                            **data['reprfuncargs'])
+                    if data['reprfileloc']:
+                        reprfileloc = ReprFileLocation(
+                            **data['reprfileloc'])
+                    if data['reprlocals']:
+                        reprlocals = ReprLocals(
+                            data['reprlocals']['lines'])
+
+                    reprentry = ReprEntry(
+                        lines=data['lines'],
+                        reprfuncargs=reprfuncargs,
+                        reprlocals=reprlocals,
+                        filelocrepr=reprfileloc,
+                        style=data['style']
+                    )
+                elif entry_type == 'ReprEntryNative':
+                    reprentry = ReprEntryNative(data['lines'])
+                else:
+                    report_unserialization_failure(
+                        entry_type, name, reportdict)
+                unserialized_entries.append(reprentry)
+
+            what.reprtraceback.reprentries = unserialized_entries
         return element_maker(self.name or name, self.namespace)(legalize_xml(unicodify(what)))
 
 
